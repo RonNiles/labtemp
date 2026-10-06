@@ -6,7 +6,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 2,
+  "version": 3,
   "refresh": "1m",
   "editable": true,
   "time": {
@@ -25,7 +25,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 16,
+        "w": 24,
         "h": 5
       },
       "targets": [
@@ -61,66 +61,6 @@
         "graphMode": "none",
         "textMode": "value_and_name",
         "orientation": "vertical"
-      }
-    },
-    {
-      "id": 2,
-      "type": "stat",
-      "title": "Last reading",
-      "datasource": {
-        "type": "influxdb",
-        "uid": "labtemp-influx"
-      },
-      "description": "Time since the sensor last reported. Red after 10 minutes: sensor down, or it can't reach the broker.",
-      "gridPos": {
-        "x": 16,
-        "y": 0,
-        "w": 8,
-        "h": 5
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "datasource": {
-            "type": "influxdb",
-            "uid": "labtemp-influx"
-          },
-          "query": "from(bucket: \"labtemp\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"temperature\" and r._field == \"value\")\n  |> group()\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, age: float(v: int(v: now()) - int(v: r._time)) / 1000000000.0}))\n"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "s",
-          "decimals": 0,
-          "displayName": "ago",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 600
-              }
-            ]
-          },
-          "noValue": "no data"
-        },
-        "overrides": []
-      },
-      "options": {
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "colorMode": "background",
-        "graphMode": "none",
-        "textMode": "value"
       }
     },
     {
