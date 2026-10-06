@@ -37,6 +37,10 @@ Send the sensor a command (example: report full status):
 ```
 podman exec labtemp sh -c 'mosquitto_pub -u admin -P "$(cat /data/secrets/mqtt-admin)" -t cmnd/tasmota_F0A93B/Status -m 0'
 ```
+Sensor hardening (2026-10-06): `Webserver 0`, `WifiConfig 4` (no fallback setup hotspot), `Emulation 0`,
+`SetOption55 0` (no mDNS), `SetOption1 1` (no button multi-press actions). Its web password, for when the web
+server is turned back on, is in `data/secrets/tasmota-web`. Querying `WebPassword` returns it in plain text.
+
 If you change the `tasmota` password, send the sensor `MqttPassword <new>` **before** restarting the broker, or it
 will be locked out, and then only a serial cable can fix it.
 
