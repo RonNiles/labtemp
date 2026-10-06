@@ -6,7 +6,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "1m",
   "editable": true,
   "time": {
@@ -35,7 +35,7 @@
             "type": "influxdb",
             "uid": "labtemp-influx"
           },
-          "query": "import \"dict\"\nnames = [\n  \"000000C43585\": \"DS18B20-1 (000000C43585)\",\n  \"000000C45051\": \"DS18B20-2 (000000C45051)\",\n]\nfrom(bucket: \"labtemp\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"temperature\" and r._field == \"value\")\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: dict.get(dict: names, key: r.id, default: r.id)}))\n  |> group(columns: [\"_field\"])\n"
+          "query": "import \"dict\"\nnames = [\n  \"000000C43585\": \"Chassis\",\n  \"000000C45051\": \"Ambient\",\n]\nfrom(bucket: \"labtemp\")\n  |> range(start: -30d)\n  |> filter(fn: (r) => r._measurement == \"temperature\" and r._field == \"value\")\n  |> last()\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: dict.get(dict: names, key: r.id, default: r.id)}))\n  |> group(columns: [\"_field\"])\n"
         }
       ],
       "fieldConfig": {
@@ -144,7 +144,7 @@
             "type": "influxdb",
             "uid": "labtemp-influx"
           },
-          "query": "import \"dict\"\nnames = [\n  \"000000C43585\": \"DS18B20-1 (000000C43585)\",\n  \"000000C45051\": \"DS18B20-2 (000000C45051)\",\n]\nfrom(bucket: \"labtemp\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"temperature\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: dict.get(dict: names, key: r.id, default: r.id)}))\n  |> group(columns: [\"_field\"])\n"
+          "query": "import \"dict\"\nnames = [\n  \"000000C43585\": \"Chassis\",\n  \"000000C45051\": \"Ambient\",\n]\nfrom(bucket: \"labtemp\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"temperature\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: dict.get(dict: names, key: r.id, default: r.id)}))\n  |> group(columns: [\"_field\"])\n"
         }
       ],
       "fieldConfig": {
