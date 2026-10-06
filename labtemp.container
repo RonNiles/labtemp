@@ -1,0 +1,21 @@
+# Quadlet unit: install as ~/.config/containers/systemd/labtemp.container
+[Unit]
+Description=Lab temperature telemetry (mosquitto + InfluxDB 2 + Grafana)
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=localhost/labtemp:latest
+ContainerName=labtemp
+Volume=%h/labtemp/data:/data:Z
+Volume=%h/labtemp/grafana:/etc/labtemp/grafana:ro,Z
+PublishPort=1883:1883
+PublishPort=3001:3001
+PublishPort=127.0.0.1:8086:8086
+
+[Service]
+Restart=always
+TimeoutStartSec=120
+
+[Install]
+WantedBy=default.target
