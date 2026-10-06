@@ -20,6 +20,8 @@ MQTT_PORT = 1883
 INFLUX_URL = os.environ.get("INFLUX_HOST", "http://localhost:8086")
 WRITE_URL = f"{INFLUX_URL}/api/v2/write?org=lab&bucket=labtemp&precision=ns"
 TOKEN_FILE = "/data/secrets/influx-token"
+MQTT_USER = "subscriber"
+MQTT_PASSWORD_FILE = "/data/secrets/mqtt-subscriber"
 
 log = logging.getLogger("subscriber")
 
@@ -98,6 +100,8 @@ def main():
     if hasattr(mqtt, "CallbackAPIVersion"):  # paho-mqtt 2.x
         kwargs["callback_api_version"] = mqtt.CallbackAPIVersion.VERSION1
     client = mqtt.Client(**kwargs)
+    with open(MQTT_PASSWORD_FILE) as f:
+        client.username_pw_set(MQTT_USER, f.read().strip())
     client.on_connect = on_connect
     client.on_message = on_message
     client.reconnect_delay_set(min_delay=1, max_delay=30)

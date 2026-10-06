@@ -28,6 +28,7 @@ ENV INFLUXD_BOLT_PATH=/data/influxdb/influxd.bolt \
 
 COPY supervisord.conf /etc/labtemp/
 COPY mosquitto.conf /etc/mosquitto/labtemp.conf
+COPY mosquitto.acl /etc/mosquitto/labtemp.acl
 COPY subscriber.py entrypoint.sh /usr/local/bin/
 # grafana/ is also bind-mounted over this at run time so dashboard edits need no rebuild.
 COPY grafana /etc/labtemp/grafana

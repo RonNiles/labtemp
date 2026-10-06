@@ -1,0 +1,16 @@
+# The sensor publishes only its own telemetry and status, and may receive commands.
+user tasmota
+topic write tele/tasmota_F0A93B/#
+topic write stat/tasmota_F0A93B/#
+topic write tasmota/discovery/#
+topic read cmnd/tasmota_F0A93B/#
+topic read cmnd/tasmotas/#
+topic read cmnd/DVES_F0A93B_fb/#
+
+# subscriber.py only reads the sensor readings.
+user subscriber
+topic read tele/tasmota_F0A93B/SENSOR
+
+# Only admin can send commands to the sensor.
+user admin
+topic readwrite #
