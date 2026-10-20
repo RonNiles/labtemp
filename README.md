@@ -1,7 +1,8 @@
 # labtemp: lab ambient and chassis temperature
 
 A Tasmota board with two DS18B20 probes publishes over MQTT to this host. The readings are stored in InfluxDB 2 and
-graphed in Grafana. Everything runs in one rootless podman container, `labtemp`, under supervisord:
+graphed in Grafana. Everything runs in one rootless podman container, `labtemp`, under supervisord, as an unprivileged
+user on a Linux VM with a static address:
 
 | program    | what                                                        | port                     |
 |------------|-------------------------------------------------------------|--------------------------|
@@ -10,17 +11,34 @@ graphed in Grafana. Everything runs in one rootless podman container, `labtemp`,
 | influxd    | InfluxDB 2, org `lab`, bucket `labtemp`, kept forever       | 8086 (127.0.0.1 only)    |
 | grafana    | dashboard "Lab Temperature" (home page)                     | 3001 (all interfaces)    |
 
-The Memory Machine X Grafana on this host is a separate instance (port 8092, behind Caddy on 8080). This container
-doesn't touch it.
+## Install on a new host
+As an unprivileged user with rootless podman (subuid/subgid ranges assigned) and lingering enabled
+(`sudo loginctl enable-linger <user>`, so the container runs without a login and starts at boot):
+```
+git clone https://github.com/RonNiles/labtemp.git ~/labtemp
+podman build -t localhost/labtemp:latest ~/labtemp
+mkdir -p ~/.config/containers/systemd && cp ~/labtemp/labtemp.container ~/.config/containers/systemd/
+systemctl --user daemon-reload && systemctl --user start labtemp
+```
+The first start creates `data/`: the InfluxDB org and bucket, and random passwords and tokens in `data/secrets/`. To move
+an existing installation instead, stop it and copy its `data/` across before the first start. Grafana's `data/grafana/plugins`
+(about 500 MB) need not be copied; Grafana downloads them again.
 
 ## View
-`http://<lab-amd0>:3001/`. Anonymous access is read-only. To edit, log in as `admin` with the password in
+`http://<host>:3001/`. Anonymous access is read-only. To edit, log in as `admin` with the password in
 `data/secrets/grafana-admin`.
 
 ## Point the sensor here
-In the Tasmota console: `Backlog MqttHost <lab-amd0 IP>; MqttPort 1883; MqttUser tasmota; MqttPassword <data/secrets/mqtt-tasmota>; TelePeriod 60`
-(TelePeriod defaults to 300 s). The sensor's web server is off (`Webserver 0`), so change its settings over MQTT, see below. lab-amd0's Wi-Fi address comes from DHCP and changes. Give it a reservation
-(MAC 74:19:f8:17:5e:3a), or the sensor will lose the broker.
+In the Tasmota console: `Backlog MqttHost <host IP>; MqttPort 1883; MqttUser tasmota; MqttPassword <data/secrets/mqtt-tasmota>; TelePeriod 60`
+(TelePeriod defaults to 300 s). The sensor stores the broker as an IP address, so run this on a host whose address does
+not change: a static address or a DHCP reservation. Until Oct 2026 it ran on a lab server whose Wi-Fi address came from
+DHCP, and the sensor lost the broker when that address changed.
+
+The sensor's web server is off (`Webserver 0`), so change its settings over MQTT (see below) or, when it cannot reach
+the broker, over its USB serial port. That port (115200 8N1) accepts the same console commands, one per line. On most
+ESP boards the USB bridge's DTR and RTS lines drive the chip's reset and boot pins, so keep both inactive while the port
+is open, or the board resets or enters its bootloader. Changing `MqttHost` restarts the board and the new value is
+kept in flash.
 
 ## Broker logins
 Anonymous access is off. Passwords are in `data/secrets/mqtt-<user>`, and `entrypoint.sh` hashes them into the broker's
@@ -67,4 +85,9 @@ Rebuild after changing `subscriber.py`, the configs or the Containerfile:
 
 ## Back up
 Everything that persists is in `data/` (InfluxDB, Grafana, secrets; the broker keeps no state). Stop the unit and copy it.
-`data/` is gitignored.
+`data/` is gitignored and must never be committed: it holds the passwords and tokens.
+
+## Notes
+The broker's configuration is installed under `/etc/mosquitto/` in the image and persistence is off. A host AppArmor
+profile for `/usr/sbin/mosquitto` (present when mosquitto is installed on an Ubuntu host) also confines the broker inside
+the container, and would deny a configuration file elsewhere or writes under `/data`.
