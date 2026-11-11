@@ -181,7 +181,7 @@
             "type": "influxdb",
             "uid": "labtemp-influx"
           },
-          "query": "import \"dict\"\nnames = [\n  \"000000C43585\": \"Chassis\",\n  \"000000C45051\": \"Ambient\",\n]\nfrom(bucket: \"labtemp\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"temperature\" and r._field == \"value\")\n  |> aggregateWindow(every: v.windowPeriod, fn: mean, createEmpty: false)\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: dict.get(dict: names, key: r.id, default: r.id)}))\n  |> group(columns: [\"_field\"])\n"
+          "query": "import \"dict\"\nnames = [\n  \"000000C43585\": \"Chassis\",\n  \"000000C45051\": \"Ambient\",\n]\n// Readings arrive every 60 s: never use windows under 2 min, so empty windows mean real gaps.\nevery = if int(v: v.windowPeriod) > int(v: 2m) then v.windowPeriod else 2m\n\nfrom(bucket: \"labtemp\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"temperature\" and r._field == \"value\")\n  |> aggregateWindow(every: every, fn: mean, createEmpty: true)\n  |> map(fn: (r) => ({_time: r._time, _value: r._value, _field: dict.get(dict: names, key: r.id, default: r.id)}))\n  |> group(columns: [\"_field\"])\n"
         }
       ],
       "fieldConfig": {
@@ -190,7 +190,7 @@
           "decimals": 1,
           "custom": {
             "lineWidth": 2,
-            "spanNulls": 900000,
+            "spanNulls": false,
             "showPoints": "never"
           }
         },
