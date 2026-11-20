@@ -7,7 +7,7 @@ user on a Linux VM with a static address:
 | program    | what                                                        | port                     |
 |------------|-------------------------------------------------------------|--------------------------|
 | mosquitto  | MQTT broker, password login + per-user access rules         | 1883 (all interfaces)    |
-| subscriber | `tele/tasmota_F0A93B/SENSOR` -> InfluxDB (`subscriber.py`)  | -                        |
+| subscriber | `tele/tasmota_F0A93B/SENSOR` + `INFO3` -> InfluxDB (`subscriber.py`) | -               |
 | influxd    | InfluxDB 2, org `lab`, bucket `labtemp`, kept forever       | 8086 (127.0.0.1 only)    |
 | grafana    | dashboard "Lab Temperature" (home page)                     | 3001 (all interfaces)    |
 
@@ -48,7 +48,7 @@ Access rules are in `mosquitto.acl`:
 | user       | may                                                                      |
 |------------|--------------------------------------------------------------------------|
 | tasmota    | publish `tele/` and `stat/tasmota_F0A93B/#`; receive its own commands    |
-| subscriber | read `tele/tasmota_F0A93B/SENSOR`                                        |
+| subscriber | read `tele/tasmota_F0A93B/SENSOR` and `tele/tasmota_F0A93B/INFO3`        |
 | admin      | everything, and it is the only login that can send the sensor commands   |
 
 Send the sensor a command (example: report full status):
@@ -62,9 +62,28 @@ server is turned back on, is in `data/secrets/tasmota-web`. Querying `WebPasswor
 If you change the `tasmota` password, send the sensor `MqttPassword <new>` **before** restarting the broker, or it
 will be locked out, and then only a serial cable can fix it.
 
+### Auto-restart rule
+The sensor once stayed off the network for 8 days until its reset button was pressed. It now carries this rule
+(set over MQTT as `Rule1 <text>` then `Rule1 1`; it is stored on the board):
+```
+ON System#Boot DO RuleTimer1 600 ENDON
+ON Mqtt#Disconnected DO RuleTimer1 600 ENDON
+ON Mqtt#Connected DO RuleTimer1 0 ENDON
+ON Rules#Timer=1 DO Backlog Mem1 %utctime%; Restart 1 ENDON
+```
+It restarts the board after 10 minutes without a broker connection, and first stores the time (Unix seconds) in
+`Mem1`, which survives the restart. Send `Mem1` (empty payload) to read when the rule last fired; empty means never.
+It cannot help if the firmware freezes outright. While the broker or this host is down, the board restarts every
+10 minutes, so its boot count climbs; that is expected.
+
 ## Data
 Measurement `temperature`, field `value`, tags `probe` (DS18B20-1...), `id` (probe ROM id), `unit` (F). The timestamp
 is when the reading was received; Tasmota's `Time` has no timezone. A new probe is picked up automatically.
+
+Measurement `restart`, tag `device`, fields `reason` and `boot_count`: one point per sensor boot, from its `INFO3`
+announcement. The dashboard shows these as orange "Sensor restarts" markers. A restart by the rule above reads
+`Software/System restart`, as does a `Restart` command; the button or a power cut reads `External System`; a crash
+reads `Exception` or `Hardware Watchdog`. Check `Mem1` to tell the rule from a command.
 
 ## Name the probes
 The dashboard labels series by probe id. When you know which probe is ambient and which is chassis, edit the `names`

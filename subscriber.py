@@ -4,6 +4,9 @@
 Every top-level key whose value is an object with a numeric "Temperature" becomes one point:
     temperature,probe=DS18B20-1,id=000000C43585,unit=F value=78.6 <receive time ns>
 Tasmota's "Time" field carries no timezone, so the receive time is used instead.
+
+The sensor also announces each boot on tele/<device>/INFO3; that becomes one point:
+    restart,device=tasmota_F0A93B reason="External System",boot_count=42i <receive time ns>
 """
 import json
 import logging
@@ -15,6 +18,7 @@ import urllib.request
 import paho.mqtt.client as mqtt
 
 TOPIC = os.environ.get("LABTEMP_TOPIC", "tele/tasmota_F0A93B/SENSOR")
+RESTART_TOPIC = TOPIC.rsplit("/", 1)[0] + "/INFO3"
 MQTT_HOST = "localhost"
 MQTT_PORT = 1883
 INFLUX_URL = os.environ.get("INFLUX_HOST", "http://localhost:8086")
@@ -49,6 +53,24 @@ def to_lines(payload, ts_ns):
     return lines
 
 
+def field_str(value):
+    """Quote a string field value for InfluxDB line protocol."""
+    return '"' + str(value).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def restart_lines(topic, payload, ts_ns):
+    """INFO3 is {"Info3": {"RestartReason": ..., "BootCount": ...}}; older firmware sends it flat."""
+    info = payload.get("Info3", payload)
+    if not isinstance(info, dict) or "RestartReason" not in info:
+        return []
+    fields = [f"reason={field_str(info['RestartReason'])}"]
+    boots = info.get("BootCount")
+    if isinstance(boots, int) and not isinstance(boots, bool):
+        fields.append(f"boot_count={boots}i")
+    device = topic.split("/")[1]
+    return [f"restart,device={tag(device)} {','.join(fields)} {ts_ns}"]
+
+
 def write(lines, token):
     req = urllib.request.Request(
         WRITE_URL,
@@ -61,8 +83,8 @@ def write(lines, token):
 
 
 def on_connect(client, userdata, flags, rc, properties=None):
-    log.info("connected to broker (rc=%s), subscribing to %s", rc, TOPIC)
-    client.subscribe(TOPIC, qos=0)
+    log.info("connected to broker (rc=%s), subscribing to %s and %s", rc, TOPIC, RESTART_TOPIC)
+    client.subscribe([(TOPIC, 0), (RESTART_TOPIC, 0)])
 
 
 def on_message(client, userdata, msg):
@@ -75,9 +97,12 @@ def on_message(client, userdata, msg):
     if not isinstance(payload, dict):
         log.warning("unexpected payload on %s: %r", msg.topic, msg.payload[:200])
         return
-    lines = to_lines(payload, ts_ns)
+    if msg.topic == RESTART_TOPIC:
+        lines = restart_lines(msg.topic, payload, ts_ns)
+    else:
+        lines = to_lines(payload, ts_ns)
     if not lines:
-        log.warning("no temperatures in message: %r", msg.payload[:200])
+        log.warning("nothing to record in message on %s: %r", msg.topic, msg.payload[:200])
         return
     try:
         write(lines, userdata["token"])
@@ -85,7 +110,7 @@ def on_message(client, userdata, msg):
         body = e.read()[:200] if isinstance(e, urllib.error.HTTPError) else b""
         log.error("InfluxDB write failed, %d point(s) dropped: %s %r", len(lines), e, body)
         return
-    log.info("wrote %s", "; ".join(line.split(" ", 2)[0] + " " + line.split(" ", 2)[1] for line in lines))
+    log.info("wrote %s", "; ".join(line.rsplit(" ", 1)[0] for line in lines))
 
 
 def main():

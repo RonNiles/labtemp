@@ -213,5 +213,22 @@
         }
       }
     }
-  ]
+  ],
+  "annotations": {
+    "list": [
+      {
+        "name": "Sensor restarts",
+        "datasource": {
+          "type": "influxdb",
+          "uid": "labtemp-influx"
+        },
+        "enable": true,
+        "iconColor": "orange",
+        "target": {
+          "refId": "Anno",
+          "query": "from(bucket: \"labtemp\")\n  |> range(start: v.timeRangeStart, stop: v.timeRangeStop)\n  |> filter(fn: (r) => r._measurement == \"restart\")\n  |> pivot(rowKey: [\"_time\"], columnKey: [\"_field\"], valueColumn: \"_value\")\n  |> map(fn: (r) => ({\n      _time: r._time,\n      text: \"Sensor restart: \" + r.reason\n        + (if exists r.boot_count then \" (boot \" + string(v: r.boot_count) + \")\" else \"\"),\n  }))\n  |> group()\n"
+        }
+      }
+    ]
+  }
 }
